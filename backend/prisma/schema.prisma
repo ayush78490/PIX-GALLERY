@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String?
+  name          String?
+  role          String    @default("photographer")
+  status        String    @default("pending")
+  emailVerified DateTime?
+  image         String?
+  googleId      String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+
+  profile                Profile?
+  organization           Organization?
+  otpTokens              OtpToken[]
+  events                 Event[]
+  bookingsMade           Booking[]    @relation("ClientBookings")
+  bookingsRecv           Booking[]    @relation("PhotographerBookings")
+  photos                 Photo[]
+  notifications          Notification[]
+  verificationRequests   VerificationRequest[]
+  verificationReviews    VerificationRequest[] @relation("Reviewer")
+  auditLogs              AuditLog[]
+  driveSyncState         DriveSyncState?
+  photographerOrganizations PhotographerOrganization[] @relation("PhotographerOrgs")
+
+  @@index([email])
+  @@index([googleId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Profile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  displayName         String?
+  contactEmail        String?
+  contactPhone        String?
+  bio                 String?
+  servicesOffered     String?
+  pricingInfo         String?
+  portfolioVisibility String  @default("public")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  orgName     String?
+  website     String?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photographers PhotographerOrganization[]
+}
+
+model PhotographerOrganization {
+  id                 String   @id @default(uuid())
+  photographerUserId String
+  organizationId     String
+  roleTitle          String?
+  createdAt          DateTime @default(now())
+
+  photographer   User   @relation("PhotographerOrgs", fields: [photographerUserId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([photographerUserId])
+}
+
+model OtpToken {
+  id        String   @id @default(uuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@index([email])
+}
+
+model Event {
+  id            String   @id @default(uuid())
+  ownerUserId   String
+  title         String
+  description   String?
+  eventDate     DateTime?
+  location      String?
+  visibility    String   @default("private")
+  shareCode     String?  @unique
+  driveFolderId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner   User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  albums  Album[]
+  gallery Gallery?
+  bookings Booking[]
+
+  @@index([shareCode])
+}
+
+model Album {
+  id          String   @id @default(uuid())
+  eventId     String
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photos Photo[]
+}
+
+model Photo {
+  id           String   @id @default(uuid())
+  albumId      String
+  uploaderUserId String
+  driveFileId  String   @unique
+  driveFolderId String?
+  mimeType     String
+  width        Int?
+  height       Int?
+  takenAt      DateTime?
+  tags         String?
+  status       String   @default("syncing")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  album    Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  uploader User  @relation(fields: [uploaderUserId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model DriveSyncState {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  lastSyncToken String?
+  lastSyncedAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Gallery {
+  id           String   @id @default(uuid())
+  eventId      String   @unique
+  title        String?
+  isPublic     Boolean  @default(true)
+  driveFolderId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Booking {
+  id              String   @id @default(uuid())
+  photographerUserId String
+  clientUserId    String?
+  eventId         String?
+  status          String   @default("requested")
+  scheduledStart  DateTime?
+  scheduledEnd    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  photographer User   @relation("PhotographerBookings", fields: [photographerUserId], references: [id])
+  client       User?  @relation("ClientBookings", fields: [clientUserId], references: [id])
+  event        Event? @relation(fields: [eventId], references: [id])
+
+  @@index([photographerUserId, status])
+}
+
+model VerificationRequest {
+  id         String   @id @default(uuid())
+  userId     String
+  status     String   @default("pending")
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User?   @relation("Reviewer", fields: [reviewedBy], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  payload   String?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorUserId  String
+  action     String
+  targetType String
+  targetId   String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorUserId], references: [id])
+}
+
+model Settings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
