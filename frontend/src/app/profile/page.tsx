@@ -332,7 +332,7 @@ export default function ProfilePage() {
                 <InfoCard title={isPhotographer ? "Photographer" : "Normal user"} meta={role}>
                   <div className="flex items-center gap-4">
                     {(previewImage || user.image) ? (
-                      <img className="h-16 w-16 rounded-full object-cover" src={previewImage ?? user.image} alt={displayName} />
+                      <img className="h-16 w-16 rounded-full object-cover" src={previewImage ?? user.image ?? undefined} alt={displayName} />
                     ) : (
                       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black text-xl text-white">{displayName.charAt(0).toUpperCase()}</div>
                     )}
